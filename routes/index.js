@@ -34,7 +34,7 @@ module.exports = function(app) {
 
       console.log(`Waiting 30 seconds to make call to ${name} at ${phoneNumber}`)
       // wait 30 seconds
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise(resolve => setTimeout(resolve, 30000));
 
       console.log('Calling...');
 
