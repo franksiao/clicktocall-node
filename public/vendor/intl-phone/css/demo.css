@@ -60,3 +60,7 @@ button {
 
 #result {
   margin-bottom: 100px; }
+
+#name {
+  width: 300px !important;
+}

@@ -28,28 +28,59 @@ module.exports = function(app) {
     });
 
     // Handle an AJAX POST request to place an outbound call
-    app.post('/call', function(request, response) {
-      let salesNumber = request.body.salesNumber;
-      let phoneNumber = request.body.phoneNumber;
+    app.post('/call', async function(req, response) {
+      let name = (req.body.name || '').split(' ')[0];
+      let phoneNumber = req.body.phoneNumber;
+
+      console.log(`Waiting 30 seconds to make call to ${name} at ${phoneNumber}`)
+      // wait 30 seconds
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      console.log('Calling...');
 
       // This should be the publicly accessible URL for your application
-      // Here, we just use the host for the application making the request,
+      // Here, we just use the host for the application making the req,
       // but you can hard code it or use something different if need be
       // For local development purposes remember to use ngrok and replace the headerHost
-      let headersHost = 'http://' + request.headers.host;
-
-      twilioClient.createCall(salesNumber, phoneNumber, headersHost)
-        .then((result) => {
+      let headersHost = 'http://' + req.headers.host;
+      try {
+        const result = await twilioClient.createCall(name, phoneNumber, headersHost)
         response.send({message: result});
-        })
-        .catch((error) => {
+      } catch (error) {
         response.status(500).send(error);
-        });
+      }
     });
 
     // Return TwiML instructions for the outbound call
-    app.post('/outbound/:salesNumber', function(request, response) {
-      let result = twilioClient.voiceResponse(request.params.salesNumber);
-      response.send(result);
+    app.post('/conversation/1/:name/:number', async function(req, res) {
+      let isMachine = req.body['AnsweredBy'] === 'machine_end_beep';
+      let name = req.params.name;
+      let number = req.params.number;
+
+      console.log('Step one webhook recieved.', name, number)
+
+      if (isMachine) {
+        console.log('Initiating voicemail response.')
+        let result = twilioClient.leaveVoicemail(name);
+        res.send(result);
+        console.log('Sending SMS.')
+        twilioClient.sendMessage(name, number)
+      } else {
+        console.log('Sending followup question.')
+        let result = twilioClient.askQuestion(name);
+        res.send(result);
+      }
+    });
+
+    app.post('/conversation/2', async function(req, res) {
+      console.log('Step two webhook recieved.')
+
+      let speechResult = req.body['SpeechResult'] || '';
+      speechResult = speechResult.toLowerCase();
+      let isTrue = speechResult.indexOf('yea') >= 0 || speechResult.indexOf('yes') >= 0;
+      console.log(`Detected speech is ${isTrue ? 'true' : 'false'}`);
+      console.log(speechResult);
+      let result = twilioClient.followUpResponse(isTrue);
+      res.send(result);
     });
 };
